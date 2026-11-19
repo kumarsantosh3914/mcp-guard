@@ -1,6 +1,6 @@
 # mcp-guard
 
-Guardrails for MCP (Model Context Protocol) usage. Exact design is still to be decided with the owner.
+A macOS app that asks the user to Allow or Block every MCP tool call from Claude Desktop and (through a gateway) Claude Web. See `README.md`.
 
 This file is the single source of truth for all AI coding tools (Claude Code, Cursor, Codex, Antigravity, Gemini CLI, and others). Edit rules here only.
 
@@ -10,7 +10,9 @@ This file is the single source of truth for all AI coding tools (Claude Code, Cu
 - Day 2 done: stdio proxy with development deciders (`allow`, `block`, `wait`).
 - Day 3 done: daemon (socket server, queue, PySide6 popup, menu bar icon). Proxy asks the daemon by default.
 - Day 4 done: audit log, `config.toml`, `mcp-guard status`, `mcp-guard install` and `uninstall`.
-- Day 5 done: launchd autostart, HTTP gateway core (`mcp-guard gateway`). Tunnel and claude.ai test are next.
+- Day 5 done: launchd autostart, HTTP gateway core (`mcp-guard gateway`).
+- Day 6 done: no Dock icon, gateway debug tools, SSE answers, stateless experiment. claude.ai connector is an open issue (`docs/claude-web-findings.md`).
+- Day 7: README, findings, final review.
 - Tests that need Unix sockets (`test_daemon_socket`, `test_runtime`, `test_proxy_daemon`) or ports (`tests/network`) fail in the agent sandbox. The owner runs them.
 - Plan is in `docs/design.md`, section 13.
 - Language: Python. Platform: macOS only. Deadline: 26 November 2026.
@@ -96,6 +98,8 @@ Never change `.claude/settings.json`, `.claude/hooks/`, or any other guardrail f
 | `docs/research/` | Research notes. Mark each file verified or unverified |
 | `scripts/dev_desktop_test_server.py` | Owner-run helper: add or remove the test server in Claude Desktop's config |
 | `scripts/dev_gateway_config.py` | Owner-run helper: write a gateway `config.toml` that serves the fake server |
+| `scripts/dev_mcp_client.py` | Owner-run helper: check a gateway URL with the official MCP client or raw HTTP |
+| `docs/claude-web-findings.md` | What was tested for claude.ai, results, and next steps |
 | `docs/` | Design notes and decisions |
 
 ## Keeping tools in sync

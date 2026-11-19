@@ -81,5 +81,7 @@ Answered by research (see `docs/research/claude-web-mcp.md`, section 8):
 
 Still open:
 
+- claude.ai custom connector to the gateway fails with `mcp_auth_start_failed`. See `docs/claude-web-findings.md`.
+
 - Folder where extensions are stored on macOS. The owner checks this on a real Mac.
 - Does claude.ai accept a custom connector URL that has a secret token in its path? Confirm with a real test.

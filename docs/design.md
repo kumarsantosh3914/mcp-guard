@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft for owner review. Nothing is built yet. |
+| Status | Built. Matches the code as of 2026-11-19. Claude Web connector issue: `docs/claude-web-findings.md` |
 | Platform | macOS only |
 | Language | Python 3.11 or newer |
 | Inputs | `docs/requirements.md`, `docs/research/claude-web-mcp.md` |
@@ -16,7 +16,7 @@ Every MCP request from Claude Desktop or Claude Web stops at mcp-guard, shows a 
 | MCP setup | How the call travels | Covered? | How |
 |---|---|---|---|
 | Claude Desktop, local server in `claude_desktop_config.json` | Desktop starts the server and talks over stdio | Yes | stdio proxy |
-| Claude Desktop or Claude Web, custom connector that points to a server the user runs | Anthropic's cloud calls a public HTTPS URL | Yes | HTTP gateway plus tunnel |
+| Claude Desktop or Claude Web, custom connector that points to a server the user runs | Anthropic's cloud calls a public HTTPS URL | Partly | HTTP gateway plus tunnel. Works with the official MCP client. claude.ai's connector fails with `mcp_auth_start_failed` (open issue) |
 | Claude Desktop extension (`.mcpb`) | Desktop starts it over stdio, config is managed by Desktop | No, first version | Known limit |
 | Directory connector (Notion, Figma, and others) | Anthropic's cloud calls the vendor directly | No, never | Nothing on the Mac sees the call |
 
@@ -97,7 +97,8 @@ URL for each server: `https://<tunnel host>/<token>/<server>/mcp`. Locally the g
 
 | Rule | Detail |
 |---|---|
-| Transport | MCP Streamable HTTP. `POST` carries one JSON-RPC message. Requests get a JSON answer (200). Notifications and responses get 202 |
+| Transport | MCP Streamable HTTP. `POST` carries one JSON-RPC message. Requests get an answer (200): one SSE event when the client accepts `text/event-stream`, else JSON (`response_mode`: `auto`, `json`, `sse`). Notifications and responses get 202 |
+| Stateless mode (experiment) | `stateless = true`: no `Mcp-Session-Id`, one shared server process per server, `initialize` answered once and reused. Limit: two clients that use the same request id at the same time clash. Off by default |
 | `GET` | 405. No server-to-client stream in this version, which the spec allows. Server-to-client notifications and requests are dropped |
 | Sessions | `initialize` starts a new child process of the real server and returns `Mcp-Session-Id`. Every later message must send it. `DELETE` ends it. Idle sessions close after 30 minutes. Max 10 sessions per server |
 | Checks, in order | 1. Token in the path, constant-time compare (wrong token: 404). 2. `Origin` header, if any, must be `https://claude.ai` or `https://claude.com` (else 403). 3. Client IP must be in `allowed_ips` (else 403) |
@@ -284,3 +285,5 @@ Everything else is the standard library (`asyncio`, `json`, `tomllib`, `ipaddres
 | 7 | 26 Nov | README, install guide, final review, buffer |
 
 Each day starts with a short plan and waits for the owner's "proceed".
+
+Outcome: days 1 to 5 done as planned. Day 6 added the Dock icon fix, gateway debugging tools, SSE answers, and the stateless experiment, and found the claude.ai connector issue. Day 7: README, findings, final review.

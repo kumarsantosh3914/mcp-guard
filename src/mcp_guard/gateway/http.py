@@ -61,6 +61,13 @@ def _json(status: int, body: Any, headers: dict[str, str] | None = None) -> web.
 HIDDEN_HEADERS = {"authorization", "cookie", "set-cookie", "proxy-authorization"}
 
 
+def _loggable_path(path: str) -> str:
+    """A path that is safe to log. Any other path may hold all or part of the token."""
+    if path.startswith("/.well-known/"):
+        return path[:80]
+    return "(other path)"
+
+
 def _safe_headers(headers: Any) -> dict[str, str]:
     """Headers for debug logs, without credentials."""
     return {k: ("***" if k.lower() in HIDDEN_HEADERS else v) for k, v in headers.items()}
@@ -99,9 +106,8 @@ def create_app(gw: GatewayConfig, manager: SessionManager) -> web.Application:
     @web.middleware
     async def guard(request: web.Request, handler):
         if not auth.token_matches(request.match_info.get("token"), gw.token):
-            # Log only the first path segment that is not the token, never the token itself.
-            log.warning("refused %s with a wrong or missing token (peer %s, path starts %r)",
-                        request.method, request.remote, request.path[:24] if not request.match_info else "/<token>")
+            log.warning("refused %s with a wrong or missing token (peer %s, path %s)",
+                        request.method, request.remote, _loggable_path(request.path))
             raise web.HTTPNotFound()
         if not auth.origin_allowed(request.headers.get("Origin")):
             log.warning("refused a request from origin %r", request.headers.get("Origin"))

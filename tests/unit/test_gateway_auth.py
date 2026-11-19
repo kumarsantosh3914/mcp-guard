@@ -35,6 +35,15 @@ def test_client_ip_uses_tunnel_header_only_from_local_peer():
     assert auth.client_ip("127.0.0.1", {}, True) == "127.0.0.1"
 
 
+def test_logged_paths_never_hold_the_token():
+    from mcp_guard.gateway.http import _loggable_path
+
+    token = "T" * 43
+    assert _loggable_path("/.well-known/oauth-protected-resource") == "/.well-known/oauth-protected-resource"
+    assert token[:10] not in _loggable_path("/%s/fake" % token)
+    assert _loggable_path("/%s/fake" % token) == "(other path)"
+
+
 @pytest.mark.parametrize("ip, ok", [
     ("160.79.104.1", True),
     ("160.79.111.254", True),
