@@ -6,7 +6,7 @@ This file is the single source of truth for all AI coding tools (Claude Code, Cu
 
 ## Status
 
-- Early setup. No product code yet.
+- Day 1 done when tests pass: package skeleton, `jsonrpc`, `policy`, fake MCP server. Plan is in `docs/design.md`, section 13.
 - Language: Python. Platform: macOS only. Deadline: 26 November 2026.
 - Requirements and decisions: `docs/requirements.md`. Read it before any design or code work.
 - Architecture is not final. Do not assume. Ask first.
@@ -64,7 +64,11 @@ Never change `.claude/settings.json`, `.claude/hooks/`, or any other guardrail f
 
 ## Commands
 
-- Build, test, lint: TBD. Fill this in once the stack is chosen.
+| Task | Command | Who |
+|---|---|---|
+| Create venv and install | `python3 -m venv .venv`, then `source .venv/bin/activate`, then `pip install -e ".[dev]"` | Owner only (installs are blocked for agents) |
+| Run product tests | `.venv/bin/python -m pytest` | Agent, with approval |
+| Run guardrail tests | `python3 tests/test_guard.py` | Agent, with approval |
 
 ## Layout
 

@@ -1,0 +1,37 @@
+Metadata-Version: 2.4
+Name: mcp-guard
+Version: 0.1.0
+Summary: Approve or block every MCP request from Claude Desktop and Claude Web.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: PySide6>=6.8
+Requires-Dist: aiohttp>=3.10
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24; extra == "dev"
+
+# mcp-guard
+
+Guardrails for MCP (Model Context Protocol) usage.
+
+## Status
+
+Early setup. Design and scope are not final yet.
+
+## Goals
+
+- TBD
+
+## Non-goals
+
+- TBD
+
+## Getting started
+
+- TBD
+
+## Contributing
+
+- Keep everything in English.
+- Keep changes small and simple.
+- See `AGENTS.md` for working rules. It is shared by all AI tools.
