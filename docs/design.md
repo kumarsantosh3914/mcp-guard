@@ -161,6 +161,8 @@ URL for each server: `https://<tunnel host>/<token>/<server>/mcp`. Locally the g
 | Audit log | JSON lines, mode `0600`. Arguments are truncated and common secret keys (`token`, `password`, `key`, `secret`) are masked |
 | Config edits | Installer always makes a timestamped backup first and never deletes files. Uninstall restores from the backup |
 | Token passthrough | The gateway never forwards Claude's auth headers to upstream servers |
+| Trust model | Programs on the user's own Mac are trusted. They could reach the daemon socket only as the same user, and could send a fake `CF-Connecting-IP` header to the local gateway port. People on the internet cannot: Cloudflare sets `CF-Connecting-IP` itself, and the token is still needed |
+| Dock icon | The daemon makes itself a macOS background app through the Objective-C runtime (`ctypes`, no extra package). Set `MCP_GUARD_SHOW_DOCK_ICON=1` to keep the icon for debugging |
 
 ## 7. Configuration
 

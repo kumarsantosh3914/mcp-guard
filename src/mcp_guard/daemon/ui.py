@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import signal
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -43,6 +45,47 @@ log = logging.getLogger("mcp_guard.ui")
 ARM_DELAY_MS = 1000
 MAX_ARGUMENT_CHARS = 20000
 SOURCE_NAMES = {"desktop": "Claude Desktop", "web": "Claude Web / remote connector"}
+SHOW_DOCK_ICON_ENV = "MCP_GUARD_SHOW_DOCK_ICON"
+NS_ACTIVATION_POLICY_ACCESSORY = 1
+
+
+def hide_dock_icon() -> bool:
+    """Make the daemon a macOS background (accessory) app: no Dock icon, no app menu.
+
+    Uses the Objective-C runtime through ctypes, so no extra package is needed.
+    Must run after QApplication exists. On any problem it does nothing and the
+    daemon keeps working with a Dock icon.
+    """
+    if sys.platform != "darwin" or os.environ.get(SHOW_DOCK_ICON_ENV):
+        return False
+    try:
+        import ctypes
+        import ctypes.util
+
+        objc_path = ctypes.util.find_library("objc")
+        if not objc_path:
+            return False
+        objc = ctypes.cdll.LoadLibrary(objc_path)
+        ctypes.cdll.LoadLibrary("/System/Library/Frameworks/AppKit.framework/AppKit")
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.objc_getClass.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        # objc_msgSend must be called with the exact types of each method.
+        send_get = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)(("objc_msgSend", objc))
+        send_set = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long)(
+            ("objc_msgSend", objc))
+        ns_app = send_get(objc.objc_getClass(b"NSApplication"), objc.sel_registerName(b"sharedApplication"))
+        if not ns_app:
+            return False
+        done = bool(send_set(ns_app, objc.sel_registerName(b"setActivationPolicy:"),
+                             NS_ACTIVATION_POLICY_ACCESSORY))
+    except (OSError, AttributeError, ValueError, TypeError) as exc:
+        log.warning("could not hide the Dock icon: %s", exc)
+        return False
+    if not done:
+        log.warning("macOS refused to hide the Dock icon")
+    return done
 
 
 def format_arguments(arguments: Any) -> str:
@@ -282,6 +325,8 @@ def run_daemon(socket_path: Path, config: Config) -> int:
     app = QApplication.instance() or QApplication(["mcp-guard"])
     app.setApplicationName("mcp-guard")
     app.setQuitOnLastWindowClosed(False)
+    if hide_dock_icon():
+        log.info("running as a background app (no Dock icon)")
 
     bridge = Bridge()
     runtime = DaemonRuntime(socket_path, on_change=bridge.changed.emit, audit=audit)

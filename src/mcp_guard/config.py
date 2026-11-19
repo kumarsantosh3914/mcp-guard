@@ -25,7 +25,8 @@ KNOWN_KEYS = {"timeout_seconds", "gated_methods", "log_arguments", "audit_log", 
 DEFAULT_GATEWAY_PORT = 8787
 # Anthropic's published outbound ranges for MCP tool calls (checked 2026-11-19).
 ANTHROPIC_OUTBOUND_RANGES = ("160.79.104.0/21", "153.61.208.0/20")
-GATEWAY_KEYS = {"port", "token", "allowed_ips", "trust_proxy_header", "servers"}
+GATEWAY_KEYS = {"port", "token", "allowed_ips", "trust_proxy_header", "servers", "response_mode", "stateless"}
+RESPONSE_MODES = ("auto", "json", "sse")  # auto: SSE when the client accepts it, else JSON
 SERVER_KEYS = {"command", "args", "env"}
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32,256}$")
@@ -62,6 +63,8 @@ class GatewayConfig:
     allowed_ips: tuple[str, ...] = ANTHROPIC_OUTBOUND_RANGES
     trust_proxy_header: bool = True  # read the real client IP from the tunnel's CF-Connecting-IP header
     servers: dict[str, ServerSpec] = field(default_factory=dict)
+    response_mode: str = "auto"
+    stateless: bool = False  # no Mcp-Session-Id; one shared server process per server
 
 
 @dataclass(frozen=True)
@@ -163,6 +166,16 @@ def parse_gateway(data: Any, where: str) -> GatewayConfig:
         if not isinstance(data["trust_proxy_header"], bool):
             raise ConfigError("%s: trust_proxy_header must be true or false" % where)
         values["trust_proxy_header"] = data["trust_proxy_header"]
+
+    if "stateless" in data:
+        if not isinstance(data["stateless"], bool):
+            raise ConfigError("%s: stateless must be true or false" % where)
+        values["stateless"] = data["stateless"]
+
+    if "response_mode" in data:
+        if data["response_mode"] not in RESPONSE_MODES:
+            raise ConfigError("%s: response_mode must be one of: %s" % (where, ", ".join(RESPONSE_MODES)))
+        values["response_mode"] = data["response_mode"]
 
     if "servers" in data:
         servers = data["servers"]

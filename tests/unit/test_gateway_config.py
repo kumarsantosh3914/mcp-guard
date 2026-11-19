@@ -13,6 +13,23 @@ def test_gateway_defaults():
     assert gw.allowed_ips == ANTHROPIC_OUTBOUND_RANGES
     assert gw.trust_proxy_header is True
     assert gw.servers == {}
+    assert gw.response_mode == "auto"
+
+
+def test_response_mode():
+    assert parse_config({"gateway": {"response_mode": "json"}}).gateway.response_mode == "json"
+    assert parse_config({"gateway": {"response_mode": "sse"}}).gateway.response_mode == "sse"
+
+
+def test_wants_sse():
+    from mcp_guard.gateway.http import wants_sse
+
+    both = "application/json, text/event-stream"
+    assert wants_sse(both, "auto") is True
+    assert wants_sse("application/json", "auto") is False
+    assert wants_sse(None, "auto") is False
+    assert wants_sse(both, "json") is False
+    assert wants_sse("application/json", "sse") is True
 
 
 def test_full_gateway():
@@ -48,6 +65,8 @@ def test_full_gateway():
     {"servers": {"a": {"command": "x", "args": "y"}}},
     {"servers": {"a": {"command": "x", "env": {"A": 1}}}},
     {"servers": {"a": {"command": "x", "cwd": "/"}}},
+    {"response_mode": "xml"},
+    {"stateless": "yes"},
 ])
 def test_bad_gateway(gateway):
     with pytest.raises(ConfigError):

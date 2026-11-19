@@ -68,6 +68,14 @@ def test_slow_call_does_not_block_others(tmp_path):
     assert set(res) == {0, 1, 2}
 
 
+def test_fixed_protocol_version(tmp_path):
+    proc = subprocess.run(
+        [sys.executable, str(FAKE), "--protocol-version", "2025-06-18"],
+        input=json.dumps(INIT) + "\n", capture_output=True, text=True, timeout=15,
+    )
+    assert json.loads(proc.stdout)["result"]["protocolVersion"] == "2025-06-18"
+
+
 def test_parse_error_and_unknown_method(tmp_path):
     code, res, _ = run_server(["{bad json", {"jsonrpc": "2.0", "id": 9, "method": "nope"}], tmp_path)
     assert code == 0

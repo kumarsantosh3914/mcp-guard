@@ -35,9 +35,9 @@ def call(req_id, name="echo"):
 async def client_for(tmp_path):
     made = []
 
-    async def _make(decision=Decision.ALLOW):
+    async def _make(decision=Decision.ALLOW, stateless=False):
         servers = {"fake": ServerSpec(sys.executable, (str(FAKE), "--record", str(tmp_path / "calls.jsonl")))}
-        gw = GatewayConfig(token=TOKEN, servers=servers)
+        gw = GatewayConfig(token=TOKEN, servers=servers, stateless=stateless)
         manager = SessionManager(servers, StaticDecider(decision), Policy(), 5.0)
         client = HttpClient(HttpServer(create_app(gw, manager)))
         await client.start_server()
@@ -81,6 +81,37 @@ async def test_block(client_for, tmp_path):
     assert not (tmp_path / "calls.jsonl").exists()
 
 
+async def test_sse_answer_when_client_accepts_it(client_for):
+    client = await client_for(Decision.ALLOW)
+    accept = {"Accept": "application/json, text/event-stream"}
+    r = await client.post(PATH, json=INIT, headers={**ANTHROPIC_IP, **accept})
+    assert r.status == 200
+    assert r.headers["Content-Type"].startswith("text/event-stream")
+    sid = r.headers[SESSION_HEADER]
+    text = await r.text()
+    assert text.startswith("event: message\ndata: ")
+    assert json.loads(text.split("data: ", 1)[1])["result"]["serverInfo"]["name"] == "fake-mcp-server"
+    r = await client.post(PATH, json=call(1), headers={**ANTHROPIC_IP, **accept, SESSION_HEADER: sid})
+    data = json.loads((await r.text()).split("data: ", 1)[1])
+    assert data["result"]["content"][0]["text"] == "hi"
+
+
+async def test_stateless_mode(client_for, tmp_path):
+    client = await client_for(Decision.ALLOW, stateless=True)
+    r = await client.post(PATH, json=INIT, headers=ANTHROPIC_IP)
+    assert r.status == 200
+    assert SESSION_HEADER not in r.headers
+    first = (await r.json())["result"]
+    r = await client.post(PATH, json={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=ANTHROPIC_IP)
+    assert r.status == 202
+    r = await client.post(PATH, json=call(5), headers=ANTHROPIC_IP)  # no session header needed
+    assert (await r.json())["result"]["content"][0]["text"] == "hi"
+    r = await client.post(PATH, json={**INIT, "id": 9}, headers=ANTHROPIC_IP)  # a second client
+    body = await r.json()
+    assert body["id"] == 9 and body["result"] == first  # reused, server not initialized twice
+    assert (tmp_path / "calls.jsonl").exists()
+
+
 async def test_wrong_token_is_404(client_for):
     client = await client_for()
     r = await client.post("/%s/fake/mcp" % ("x" * 43), json=INIT, headers=ANTHROPIC_IP)
@@ -91,6 +122,7 @@ async def test_ip_outside_anthropic_is_403(client_for):
     client = await client_for()
     r = await client.post(PATH, json=INIT, headers={"CF-Connecting-IP": "8.8.8.8"})
     assert r.status == 403
+    assert "Client IP 8.8.8.8 is not in allowed_ips" in await r.text()
     r = await client.post(PATH, json=INIT)  # local peer, no tunnel header
     assert r.status == 403
 

@@ -67,6 +67,9 @@ class UpstreamSession:
         self._pending: dict[Any, asyncio.Future] = {}
         self._approvals: dict[Any, asyncio.Task] = {}
         self._background: set[asyncio.Task] = set()
+        # Stateless mode only: the server is initialized once and the answer is reused.
+        self.init_result: Any = None
+        self.initialized_sent = False
 
     async def start(self) -> None:
         env = dict(os.environ)
@@ -241,9 +244,24 @@ class SessionManager:
         self.idle_seconds = idle_seconds
         self.max_sessions = max_sessions
         self._sessions: dict[tuple[str, str], UpstreamSession] = {}
+        self._shared: dict[str, UpstreamSession] = {}  # stateless mode: one process per server
+        self._shared_lock = asyncio.Lock()
 
     def __len__(self) -> int:
         return len(self._sessions)
+
+    async def shared(self, server_name: str) -> UpstreamSession:
+        """Stateless mode: the one session for this server, started on first use or after a crash."""
+        spec = self.servers[server_name]
+        async with self._shared_lock:
+            session = self._shared.get(server_name)
+            if session is None or session.closed:
+                if session is not None:
+                    await session.close()
+                session = UpstreamSession(server_name, spec, self.decider, self.policy, self.timeout)
+                await session.start()
+                self._shared[server_name] = session
+            return session
 
     async def create(self, server_name: str) -> UpstreamSession:
         """Start a new session. Raises KeyError for an unknown server, TooManySessions, or OSError."""
@@ -279,6 +297,7 @@ class SessionManager:
                 await session.close()
 
     async def close_all(self) -> None:
-        sessions = list(self._sessions.values())
+        sessions = list(self._sessions.values()) + list(self._shared.values())
         self._sessions.clear()
+        self._shared.clear()
         await asyncio.gather(*(s.close() for s in sessions), return_exceptions=True)

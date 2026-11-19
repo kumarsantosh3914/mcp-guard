@@ -133,6 +133,21 @@ def test_other_method_heading(window):
     assert window.tool.text() == "(none)"
 
 
+def test_dock_icon_can_be_kept_for_debugging(monkeypatch):
+    from mcp_guard.daemon.ui import SHOW_DOCK_ICON_ENV, hide_dock_icon
+
+    monkeypatch.setenv(SHOW_DOCK_ICON_ENV, "1")
+    assert hide_dock_icon() is False
+
+
+def test_hide_dock_icon_does_nothing_off_macos(monkeypatch):
+    from mcp_guard.daemon import ui
+
+    monkeypatch.delenv(ui.SHOW_DOCK_ICON_ENV, raising=False)
+    monkeypatch.setattr(ui.sys, "platform", "linux")
+    assert ui.hide_dock_icon() is False
+
+
 def test_format_arguments():
     assert "too large" in format_arguments({"_truncated": True, "preview": "abc"})
     assert "cannot be shown" in format_arguments({"_unprintable": True})

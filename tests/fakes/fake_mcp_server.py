@@ -16,6 +16,9 @@ Methods (besides the MCP ones):
 Options:
   --record PATH   append one JSON line for every tools/call that reaches this server.
                   Tests use it to prove that blocked calls never arrive.
+  --protocol-version V
+                  always answer initialize with this protocol version, like a real
+                  server that supports only some versions. Default: echo the client's.
 
 Each tools/call runs in its own thread, so slow calls do not hold up others.
 """
@@ -107,6 +110,9 @@ def call_tool(req_id, params, record_path):
         send_error(req_id, -32602, "unknown tool: " + str(name))
 
 
+FIXED_PROTOCOL_VERSION = None  # set by --protocol-version
+
+
 def handle(msg, record_path, threads):
     if not isinstance(msg, dict):
         send_error(None, -32600, "invalid request")
@@ -118,7 +124,7 @@ def handle(msg, record_path, threads):
     if method == "initialize":
         params = msg.get("params") if isinstance(msg.get("params"), dict) else {}
         send_result(req_id, {
-            "protocolVersion": params.get("protocolVersion", PROTOCOL_VERSION),
+            "protocolVersion": FIXED_PROTOCOL_VERSION or params.get("protocolVersion", PROTOCOL_VERSION),
             "capabilities": {"tools": {}},
             "serverInfo": {"name": "fake-mcp-server", "version": "0.1.0"},
         })
@@ -146,7 +152,10 @@ def handle(msg, record_path, threads):
 def main():
     parser = argparse.ArgumentParser(description="Fake MCP server for tests.")
     parser.add_argument("--record", help="file to append received tools/call messages to")
+    parser.add_argument("--protocol-version", help="always answer initialize with this version")
     args = parser.parse_args()
+    global FIXED_PROTOCOL_VERSION
+    FIXED_PROTOCOL_VERSION = args.protocol_version
 
     threads = []
     while True:
