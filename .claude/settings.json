@@ -4,7 +4,29 @@
     "disableBypassPermissionsMode": "disable",
     "disableAutoMode": "disable",
     "deny": [
-      "Bash(git *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git fetch *)",
+      "Bash(git clone *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git reset *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git restore *)",
+      "Bash(git clean *)",
+      "Bash(git rm *)",
+      "Bash(git mv *)",
+      "Bash(git stash push *)",
+      "Bash(git stash drop *)",
+      "Bash(git stash clear *)",
+      "Bash(git cherry-pick *)",
+      "Bash(git revert *)",
+      "Bash(git init *)",
+      "Bash(git -C *)",
+      "Bash(git -c *)",
       "Bash(gh *)",
       "Bash(rm *)",
       "Bash(rmdir *)",
@@ -35,8 +57,6 @@
       "Bash(mongosh *)",
       "Bash(redis-cli *)",
       "Bash(prisma *)",
-      "WebFetch",
-      "WebSearch",
       "mcp__*",
       "Read(./.env)",
       "Read(./.env.*)",
@@ -44,13 +64,16 @@
       "Edit(./.env)",
       "Edit(./.env.*)",
       "Edit(./secrets/**)",
-      "Edit(/.claude/**)"
+      "Edit(/.claude/**)",
+      "Edit(/.git/**)"
     ],
     "ask": [
       "Bash",
       "Write",
       "Edit",
-      "NotebookEdit"
+      "NotebookEdit",
+      "WebSearch",
+      "WebFetch"
     ]
   },
   "sandbox": {
