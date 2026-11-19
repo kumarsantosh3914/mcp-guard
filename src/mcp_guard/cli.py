@@ -3,8 +3,9 @@
 Commands:
   daemon     run the approval daemon (popup and menu bar icon)
   proxy      run one stdio MCP server behind mcp-guard
+  gateway    serve local MCP servers to Claude Web over HTTP, through mcp-guard
   status     show what is running and which Claude Desktop servers are protected
-  install    put every local Claude Desktop server behind mcp-guard
+  install    put every local Claude Desktop server behind mcp-guard, and start the daemon at login
   uninstall  undo install
 
 Everything after a bare `--` is the real MCP server command, passed through unchanged.
@@ -23,6 +24,7 @@ from .approval.decider import DEV_DECIDERS, Decider, make_decider
 from .approval.protocol import default_socket_path
 from .config import ALWAYS_GATED, ConfigError, default_config_path, load_config
 from .install import desktop_config as dc
+from .install import launchd
 from .policy import Policy
 from .proxy.stdio_proxy import StdioProxy, run_stdio_proxy
 
@@ -82,16 +84,22 @@ def build_parser() -> argparse.ArgumentParser:
     proxy.add_argument("--config", type=Path, help=config_help)
     proxy.add_argument("--log-level", default="info", choices=LOG_LEVELS)
 
+    gateway = sub.add_parser("gateway", help="serve local MCP servers to Claude Web over HTTP, through mcp-guard")
+    gateway.add_argument("--socket", type=Path, help=socket_help)
+    gateway.add_argument("--config", type=Path, help=config_help)
+    gateway.add_argument("--log-level", default="info", choices=LOG_LEVELS)
+
     status = sub.add_parser("status", help="show what is running and which servers are protected")
     status.add_argument("--socket", type=Path, help=socket_help)
     status.add_argument("--config", type=Path, help=config_help)
     status.add_argument("--desktop-config", type=Path, help=desktop_help)
 
-    for name, text in (("install", "put every local Claude Desktop server behind mcp-guard"),
-                       ("uninstall", "remove mcp-guard from the servers that install changed")):
+    for name, text in (("install", "put every local Claude Desktop server behind mcp-guard, start daemon at login"),
+                       ("uninstall", "remove mcp-guard from the servers that install changed, stop autostart")):
         p = sub.add_parser(name, help=text)
         p.add_argument("--desktop-config", type=Path, help=desktop_help)
         p.add_argument("--dry-run", action="store_true", help="show the changes without writing anything")
+        p.add_argument("--no-autostart", action="store_true", help="leave the login item (launchd agent) alone")
     return parser
 
 
@@ -132,6 +140,18 @@ def _cmd_proxy(args: argparse.Namespace, server_command: list[str], parser: argp
     return asyncio.run(run_stdio_proxy(proxy))
 
 
+def _cmd_gateway(args: argparse.Namespace) -> int:
+    _setup_logging(args.log_level)
+    try:
+        config = load_config(args.config)
+    except ConfigError as exc:
+        logging.getLogger("mcp_guard").error("bad config, the gateway will not start: %s", exc)
+        return 2
+    from .gateway.http import run_gateway  # imported here: only the gateway needs aiohttp
+
+    return run_gateway(config, args.socket or default_socket_path())
+
+
 # ---- status ----
 
 def _cmd_status(args: argparse.Namespace) -> int:
@@ -149,11 +169,18 @@ def _cmd_status(args: argparse.Namespace) -> int:
     socket_path = args.socket or default_socket_path()
     running = asyncio.run(socket_is_alive(socket_path))
     print("Daemon:      %s (%s)" % ("running" if running else "NOT running", socket_path))
+    print("Autostart:   %s (%s)" % (launchd.agent_status(), launchd.default_plist_path()))
     if config is not None:
         log_path = config.audit_log
         print("Audit log:   %s (%s)" % (log_path, "exists" if log_path.exists() else "not created yet"))
         print("Timeout:     %g s" % config.timeout_seconds)
         print("Gated:       %s" % ", ".join(sorted(config.gated_methods)))
+        gw = config.gateway
+        if gw.servers:
+            print("Gateway:     port %d, token %s, servers: %s" % (
+                gw.port, "set" if gw.token else "NOT set", ", ".join(sorted(gw.servers))))
+        else:
+            print("Gateway:     no servers configured (only needed for Claude Web)")
 
     desktop_path = args.desktop_config or dc.default_desktop_config_path()
     print("Desktop:     %s" % desktop_path)
@@ -190,10 +217,11 @@ def _cmd_install(args: argparse.Namespace, undo: bool) -> int:
     path = args.desktop_config or dc.default_desktop_config_path()
     try:
         cfg = dc.read_desktop_config(path)
+        guard = dc.mcp_guard_command()
         if undo:
             new_cfg, changes = dc.plan_uninstall(cfg)
         else:
-            new_cfg, changes = dc.plan_install(cfg, dc.mcp_guard_command())
+            new_cfg, changes = dc.plan_install(cfg, guard)
     except dc.InstallError as exc:
         print("Error: %s" % exc, file=sys.stderr)
         return 1
@@ -201,17 +229,41 @@ def _cmd_install(args: argparse.Namespace, undo: bool) -> int:
     print("Claude Desktop config: %s" % path)
     _print_changes(changes)
     action = "unwrap" if undo else "wrap"
-    if not any(c.action == action for c in changes):
-        print("Nothing to change.")
-        return 0
+    config_changes = any(c.action == action for c in changes)
+    plist = launchd.default_plist_path()
+    if not args.no_autostart:
+        print("Autostart: %s %s" % ("remove" if undo else "install", plist))
+
     if args.dry_run:
         print("Dry run: nothing was written.")
         return 0
-    backup = dc.write_desktop_config(path, new_cfg)
-    if backup is not None:
-        print("Backup:  %s" % backup)
-    print("Done. Quit Claude Desktop (Cmd+Q) and open it again.")
-    if not undo:
+
+    restart_desktop = False
+    if config_changes:
+        backup = dc.write_desktop_config(path, new_cfg)
+        if backup is not None:
+            print("Backup:    %s" % backup)
+        restart_desktop = True
+    else:
+        print("Claude Desktop config: nothing to change.")
+
+    if not args.no_autostart:
+        try:
+            if undo:
+                removed = launchd.uninstall_agent()
+                print("Autostart: %s" % ("removed" if removed else "was not installed"))
+            else:
+                launchd.install_agent(guard)
+                print("Autostart: on. The daemon now starts at login (log: %s)" % launchd.default_daemon_log_path())
+        except dc.InstallError as exc:
+            print("Error: %s" % exc, file=sys.stderr)
+            return 1
+
+    if restart_desktop:
+        print("Done. Quit Claude Desktop (Cmd+Q) and open it again.")
+    else:
+        print("Done.")
+    if not undo and args.no_autostart:
         print("Keep the daemon running (mcp-guard daemon), or every tool call is blocked.")
     return 0
 
@@ -225,6 +277,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_daemon(args)
     if args.command == "proxy":
         return _cmd_proxy(args, tail, parser)
+    if args.command == "gateway":
+        return _cmd_gateway(args)
     if args.command == "status":
         return _cmd_status(args)
     if args.command in ("install", "uninstall"):

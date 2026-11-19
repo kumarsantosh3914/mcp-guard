@@ -91,6 +91,26 @@ A decider that fails, hangs, or gives a bad answer always means Block. If the da
 | Size | Max 1 MB per message. Arguments over 64 KB are sent to the popup as a short preview. The real request still goes to the server unchanged |
 | Threads in the daemon | Qt runs in the main thread. The socket server and queue run in an asyncio thread. Queue changes reach Qt through a Qt signal. Clicks reach the queue through `call_soon_threadsafe` |
 
+### 4.6 HTTP gateway (Claude Web and remote connectors)
+
+URL for each server: `https://<tunnel host>/<token>/<server>/mcp`. Locally the gateway listens only on `127.0.0.1:8787`.
+
+| Rule | Detail |
+|---|---|
+| Transport | MCP Streamable HTTP. `POST` carries one JSON-RPC message. Requests get a JSON answer (200). Notifications and responses get 202 |
+| `GET` | 405. No server-to-client stream in this version, which the spec allows. Server-to-client notifications and requests are dropped |
+| Sessions | `initialize` starts a new child process of the real server and returns `Mcp-Session-Id`. Every later message must send it. `DELETE` ends it. Idle sessions close after 30 minutes. Max 10 sessions per server |
+| Checks, in order | 1. Token in the path, constant-time compare (wrong token: 404). 2. `Origin` header, if any, must be `https://claude.ai` or `https://claude.com` (else 403). 3. Client IP must be in `allowed_ips` (else 403) |
+| Client IP | Behind Cloudflare Tunnel every request comes from 127.0.0.1, so the IP is read from `CF-Connecting-IP`, but only when the peer is local |
+| Gating | Same policy and same daemon popup as the stdio proxy. The popup says "Claude Web / remote connector" |
+| Limits | Body max 4 MB (413). Batches rejected (400). Upstream answer max 120 s |
+| Cancel | `notifications/cancelled` for a request waiting for approval closes its popup. If the HTTP client goes away, the popup closes too and the server gets a cancel |
+| Logs | No access log, because the path holds the token |
+
+### 4.7 Autostart
+
+`mcp-guard install` writes `~/Library/LaunchAgents/local.mcp-guard.daemon.plist` and loads it with `launchctl`. The daemon then starts at login, in the GUI session only. launchd restarts it after a crash, but not after Quit from the menu bar. If a daemon already runs, a second one exits cleanly (code 0), so launchd does not loop. `mcp-guard uninstall` unloads the agent and removes the plist, but only if its Label is ours.
+
 ### 4.3 Denial response
 
 | Request | Response to Claude |
@@ -181,9 +201,9 @@ Rules:
 | Step | Command |
 |---|---|
 | Install package | `pip install .` (in a virtual env) |
-| Set up | `mcp-guard install` wraps Desktop servers, writes config, installs the launchd agent |
+| Set up | `mcp-guard install` wraps Desktop servers and turns on autostart. `--dry-run` shows the changes first. `--no-autostart` skips launchd |
 | Restart Claude Desktop | so it starts the proxies |
-| Web, optional | `mcp-guard gateway`, then `cloudflared tunnel --url http://127.0.0.1:8787`, then add the printed URL as a custom connector in claude.ai |
+| Web, optional | Add a `token` and `[gateway.servers.<name>]` to `config.toml`, run `mcp-guard gateway`, then `cloudflared tunnel --url http://127.0.0.1:8787`, then add `https://<tunnel host>/<token>/<name>/mcp` as a custom connector in claude.ai |
 | Check | `mcp-guard status` |
 | Undo | `mcp-guard uninstall` |
 

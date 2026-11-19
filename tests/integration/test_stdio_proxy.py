@@ -24,6 +24,9 @@ ENV = dict(
     PYTHONPATH=str(ROOT / "src"),
     MCP_GUARD_SOCKET="/nonexistent/mcp-guard/daemon.sock",
     MCP_GUARD_CONFIG="/nonexistent/mcp-guard/config.toml",  # never read the owner's real config
+    MCP_GUARD_LAUNCHCTL="/usr/bin/true",  # never touch the owner's real launchd
+    MCP_GUARD_LAUNCH_AGENTS_DIR="/nonexistent/mcp-guard/LaunchAgents",
+    MCP_GUARD_LOG_DIR="/nonexistent/mcp-guard/logs",
 )
 CRASH_EXIT_CODE = 3
 

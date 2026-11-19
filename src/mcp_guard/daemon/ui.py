@@ -294,9 +294,10 @@ def run_daemon(socket_path: Path, config: Config) -> int:
     try:
         runtime.start()
     except AlreadyRunning as exc:
-        log.error("%s", exc)
+        # Exit cleanly, so launchd does not keep restarting a second copy.
+        log.warning("%s", exc)
         audit.close()
-        return 1
+        return 0
     except (DaemonError, OSError) as exc:
         log.error("could not start the daemon: %s", exc)
         audit.close()
