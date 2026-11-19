@@ -68,15 +68,28 @@ The proxy forwards the original bytes of each message. It never re-encodes them,
 
 ### 4.4 Deciders
 
-The proxy asks a "decider" for each gated request. Until the daemon exists, the proxy has three development deciders, chosen with `--decider`:
+The proxy asks a "decider" for each gated request, chosen with `--decider`:
 
 | Decider | Answer | Use |
 |---|---|---|
-| `block` (default) | Always Block | Safe default |
+| `daemon` (default) | Asks the daemon, which shows the popup | Normal use |
+| `block` | Always Block | Development |
 | `allow` | Always Allow | Tests and development only |
 | `wait` | Never answers | Tests for timeout and cancel |
 
-The daemon decider replaces these in step 3. A decider that fails, hangs, or gives a bad answer always means Block.
+A decider that fails, hangs, or gives a bad answer always means Block. If the daemon is not running, the request is blocked at once with "the mcp-guard daemon is not running".
+
+### 4.5 Proxy to daemon protocol
+
+| Rule | Detail |
+|---|---|
+| Transport | Unix socket at `~/Library/Application Support/mcp-guard/daemon.sock` (override with `MCP_GUARD_SOCKET` or `--socket`) |
+| One connection per request | The proxy connects, sends one `request` line, and waits for one `verdict` line |
+| Cancel | The proxy closes the connection. The daemon drops the request and the popup moves on |
+| Daemon closes without a verdict | The proxy blocks the request |
+| Format | One JSON object per line, with `"v": 1` and `"type"`. Unknown versions are rejected |
+| Size | Max 1 MB per message. Arguments over 64 KB are sent to the popup as a short preview. The real request still goes to the server unchanged |
+| Threads in the daemon | Qt runs in the main thread. The socket server and queue run in an asyncio thread. Queue changes reach Qt through a Qt signal. Clicks reach the queue through `call_soon_threadsafe` |
 
 ### 4.3 Denial response
 
@@ -122,6 +135,9 @@ The daemon decider replaces these in step 3. A decider that fails, hangs, or giv
 | OAuth | Future work. Documented in the README |
 | Limits | Max body size, max pending requests per source, request read timeout |
 | Popup content | Plain text only. Never render HTML or links from arguments |
+| Popup input | Block is the default button. Buttons ignore input for the first second of each new request. Esc or closing the window means Block |
+| One daemon | A live socket means a daemon already runs, so a second one exits. A leftover socket from a crash is replaced. Any other file at that path is never touched |
+| Too many requests | More than 50 waiting requests: new ones are blocked at once |
 | Audit log | JSON lines, mode `0600`. Arguments are truncated and common secret keys (`token`, `password`, `key`, `secret`) are masked |
 | Config edits | Installer always makes a timestamped backup first and never deletes files. Uninstall restores from the backup |
 | Token passthrough | The gateway never forwards Claude's auth headers to upstream servers |
@@ -206,8 +222,9 @@ Everything else is the standard library (`asyncio`, `json`, `tomllib`, `ipaddres
 
 | Risk | Plan |
 |---|---|
-| Desktop timeout is not really 60 seconds | Test early on day 2 with a slow fake tool. Change the default if needed |
-| Popup does not show over full screen apps | Try Qt window flags first. If not enough, set the macOS window level with PyObjC (one more dependency, ask first) |
+| Desktop timeout is not really 60 seconds | Tested on 2026-11-19: 55 s works, 70 s times out. The 45 s default stays |
+| Desktop does not send cancel when the user presses Stop | Tested on 2026-11-19: Stop in Claude Desktop reaches the proxy, the daemon logs "cancelled by the proxy", and the popup closes |
+| Popup does not show over full screen apps | Tested on 2026-11-19 by the owner: the popup shows above a full screen Claude Desktop with Qt window flags only. PyObjC is not needed |
 | claude.ai rejects a URL with a path token | Fall back to a token in a query string, or a custom header if supported |
 | Quick tunnel URL changes on every run | Document a named tunnel for a stable URL |
 | Qt and asyncio in one process | Run the socket server in a worker thread and send events to the UI with Qt signals |

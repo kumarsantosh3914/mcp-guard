@@ -4,7 +4,7 @@
 The owner runs this, not an agent, because it edits a file outside this project.
 
 Usage:
-  python3 scripts/dev_desktop_test_server.py add [allow|block|wait]   (default: allow)
+  python3 scripts/dev_desktop_test_server.py add [daemon|allow|block|wait]   (default: daemon)
   python3 scripts/dev_desktop_test_server.py remove
 
 Quit Claude Desktop (Cmd+Q) first, then start it again after the change.
@@ -20,7 +20,7 @@ from pathlib import Path
 CONFIG = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
 ROOT = Path(__file__).resolve().parents[1]
 NAME = "mcp-guard-test"
-DECIDERS = ("allow", "block", "wait")
+DECIDERS = ("daemon", "allow", "block", "wait")
 
 
 def server_entry(decider):
@@ -39,7 +39,7 @@ def main(argv):
         print(__doc__)
         return 2
     action = argv[1]
-    decider = argv[2] if len(argv) > 2 else "allow"
+    decider = argv[2] if len(argv) > 2 else "daemon"
     if decider not in DECIDERS:
         print("Decider must be one of: " + ", ".join(DECIDERS))
         return 2

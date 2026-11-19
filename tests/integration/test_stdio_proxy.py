@@ -18,7 +18,8 @@ from mcp_guard.proxy.stdio_proxy import BATCH_REJECTED, DUPLICATE_ID, SERVER_STO
 
 ROOT = Path(__file__).resolve().parents[2]
 FAKE = ROOT / "tests" / "fakes" / "fake_mcp_server.py"
-ENV = dict(os.environ, PYTHONPATH=str(ROOT / "src"))
+# Point the daemon decider at a socket that does not exist, so tests never reach a real daemon.
+ENV = dict(os.environ, PYTHONPATH=str(ROOT / "src"), MCP_GUARD_SOCKET="/nonexistent/mcp-guard/daemon.sock")
 CRASH_EXIT_CODE = 3
 
 
@@ -28,7 +29,7 @@ class ProxyUnderTest:
         self.record = record
 
     @classmethod
-    async def start(cls, tmp_path, decider="allow", timeout=5.0, gate=(), server_cmd=None):
+    async def start(cls, tmp_path, decider="allow", timeout=5.0, gate=(), server_cmd=None, env=None):
         record = tmp_path / "calls.jsonl"
         server = server_cmd or [sys.executable, str(FAKE), "--record", str(record)]
         args = [sys.executable, "-m", "mcp_guard", "proxy", "--name", "fake", "--timeout", str(timeout)]
@@ -41,7 +42,7 @@ class ProxyUnderTest:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=ENV,
+            env=env or ENV,
             limit=32 * 1024 * 1024,
         )
         return cls(proc, record)
@@ -140,13 +141,13 @@ async def test_allowed_call_reaches_server(start):
     assert p.calls() == [{"tool": "echo", "arguments": {"text": "hi"}}]
 
 
-async def test_default_decider_blocks_and_call_never_reaches_server(start):
-    p = await start(decider=None)
+async def test_default_decider_without_daemon_blocks_and_call_never_reaches_server(start):
+    p = await start(decider=None)  # default is the daemon decider, and no daemon runs
     await p.send(call(1, "echo", {"text": "hi"}))
     r = await p.recv()
     assert r["id"] == 1
     assert r["result"]["isError"] is True
-    assert "Blocked" in text_of(r)
+    assert "daemon is not running" in text_of(r)
     await p.send(ping(2))  # the proxy keeps working after a block
     assert (await p.recv())["id"] == 2
     assert await p.close() == 0

@@ -7,7 +7,8 @@ This file is the single source of truth for all AI coding tools (Claude Code, Cu
 ## Status
 
 - Day 1 done: package skeleton, `jsonrpc`, `policy`, fake MCP server.
-- Day 2 done: stdio proxy with development deciders (`allow`, `block`, `wait`). No popup yet.
+- Day 2 done: stdio proxy with development deciders (`allow`, `block`, `wait`).
+- Day 3 done: daemon (socket server, queue, PySide6 popup, menu bar icon). Proxy asks the daemon by default.
 - Plan is in `docs/design.md`, section 13.
 - Language: Python. Platform: macOS only. Deadline: 26 November 2026.
 - Requirements and decisions: `docs/requirements.md`. Read it before any design or code work.
@@ -69,7 +70,9 @@ Never change `.claude/settings.json`, `.claude/hooks/`, or any other guardrail f
 | Task | Command | Who |
 |---|---|---|
 | Create venv and install | `python3 -m venv .venv`, then `source .venv/bin/activate`, then `pip install -e ".[dev]"` | Owner only (installs are blocked for agents) |
-| Run product tests | `.venv/bin/python -m pytest` | Agent, with approval |
+| Run product tests | `.venv/bin/python -m pytest` | Agent, with approval. The agent sandbox blocks Unix sockets, so the socket tests fail there |
+| Run socket tests | `.venv/bin/python -m pytest tests/integration/test_daemon_socket.py tests/integration/test_runtime.py tests/integration/test_proxy_daemon.py` | Owner, in a normal terminal |
+| Run the daemon | `.venv/bin/mcp-guard daemon` | Owner |
 | Run guardrail tests | `python3 tests/test_guard.py` | Agent, with approval |
 
 ## Layout
