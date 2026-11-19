@@ -146,7 +146,17 @@ CASES = [
 
     # tools
     ("mcp tool blocked", 2, lambda: run("mcp__server__tool", {})),
-    ("WebFetch blocked", 2, lambda: run("WebFetch", {"url": "https://example.com"})),
+    ("WebSearch allowed", 0, lambda: run("WebSearch", {"query": "mcp spec"})),
+    ("WebFetch https allowed", 0, lambda: run("WebFetch", {"url": "https://example.com/docs"})),
+    ("WebFetch http blocked", 2, lambda: run("WebFetch", {"url": "http://example.com"})),
+    ("WebFetch file blocked", 2, lambda: run("WebFetch", {"url": "file:///etc/passwd"})),
+    ("WebFetch localhost blocked", 2, lambda: run("WebFetch", {"url": "https://localhost:8080"})),
+    ("WebFetch 127.x blocked", 2, lambda: run("WebFetch", {"url": "https://127.0.0.1/"})),
+    ("WebFetch private ip blocked", 2, lambda: run("WebFetch", {"url": "https://192.168.1.5/"})),
+    ("WebFetch metadata ip blocked", 2, lambda: run("WebFetch", {"url": "https://169.254.169.254/"})),
+    ("WebFetch ipv6 loopback blocked", 2, lambda: run("WebFetch", {"url": "https://[::1]/"})),
+    ("WebFetch .local blocked", 2, lambda: run("WebFetch", {"url": "https://printer.local/"})),
+    ("WebFetch login in url blocked", 2, lambda: run("WebFetch", {"url": "https://user:pw@example.com/"})),
     ("Artifact blocked", 2, lambda: run("Artifact", {})),
     ("EnterWorktree blocked", 2, lambda: run("EnterWorktree", {})),
 ]

@@ -7,7 +7,7 @@ Goal: nothing risky runs, even if Auto Mode is on. The owner approves everything
 | Layer | Where | What it does |
 |---|---|---|
 | 1. Instructions | `AGENTS.md` | Tells every AI tool the rules. Not enforced by itself. |
-| 2. Deny rules | `.claude/settings.json` | Block git, delete, database, network, install, secrets, MCP, web. Apply in every mode. |
+| 2. Deny rules | `.claude/settings.json` | Block git changes, delete, database, shell network, install, secrets, MCP. Apply in every mode. |
 | 3. Hook | `.claude/hooks/guard.py` | Checks every tool call. Tool allowlist, path jail, blocked words. Fails closed. |
 | 4. Sandbox | `.claude/settings.json` | OS level. Writes only in the project. No network. No unsandboxed retry. |
 | 5. Mode lock | `.claude/settings.json` | Bypass mode and Auto Mode are disabled. Default mode asks first. |
@@ -24,7 +24,8 @@ Goal: nothing risky runs, even if Auto Mode is on. The owner approves everything
 | Delete | `rm`, `rmdir`, `unlink`, `trash`, `shred`, `find -delete` |
 | Database | `psql`, `mysql`, `sqlite3`, `mongosh`, `redis-cli`, `prisma`, migration tools, destructive SQL text |
 | Outside the folder | `..`, `~`, `$HOME`, absolute paths outside the project, any file tool path outside |
-| Network | `curl`, `wget`, `ssh`, URLs, WebFetch, WebSearch, MCP tools |
+| Network (shell) | `curl`, `wget`, `ssh`, URLs in commands, MCP tools |
+| Web tools | WebSearch and WebFetch are allowed, but ask the owner every time. WebFetch: `https` only, no `localhost`, private IPs, `.local`, cloud metadata IPs, or login details in the URL. |
 | Installs | `npm`, `pip`, `brew`, `npx`, `cargo`, `gem` install or publish |
 | System | `sudo`, `chmod`, `chown`, `kill`, `docker`, `crontab`, `osascript` |
 | Tricks | `eval`, `xargs`, `base64`, `$(...)`, backticks, `python -c`, `node -e`, background jobs, sandbox bypass |
