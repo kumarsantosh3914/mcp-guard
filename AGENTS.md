@@ -78,6 +78,7 @@ Never change `.claude/settings.json`, `.claude/hooks/`, or any other guardrail f
 | `.claude/hooks/guard.py` | Hook that checks every tool call (owner edits only) |
 | `tests/test_guard.py` | Tests for the hook. Run `python3 tests/test_guard.py` |
 | `docs/requirements.md` | Project brief, evaluation criteria, decisions, open questions |
+| `docs/design.md` | Architecture, flows, edge cases, security, plan |
 | `docs/guardrails.md` | What is blocked and why |
 | `docs/proposed/` | Temporary. Changes to `.claude/` waiting for the owner to apply. The owner removes it after applying. |
 | `docs/research/` | Research notes. Mark each file verified or unverified |
