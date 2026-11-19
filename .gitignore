@@ -1,0 +1,17 @@
+# Secrets
+.env
+.env.*
+secrets/
+
+# OS
+.DS_Store
+
+# Claude local settings
+.claude/settings.local.json
+
+# Common build and dependency folders
+node_modules/
+dist/
+build/
+__pycache__/
+.venv/
