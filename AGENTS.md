@@ -88,6 +88,7 @@ Never change `.claude/settings.json`, `.claude/hooks/`, or any other guardrail f
 | `docs/guardrails.md` | What is blocked and why |
 | `docs/proposed/` | Temporary. Changes to `.claude/` waiting for the owner to apply. The owner removes it after applying. |
 | `docs/research/` | Research notes. Mark each file verified or unverified |
+| `scripts/dev_desktop_test_server.py` | Owner-run helper: add or remove the test server in Claude Desktop's config |
 | `docs/` | Design notes and decisions |
 
 ## Keeping tools in sync

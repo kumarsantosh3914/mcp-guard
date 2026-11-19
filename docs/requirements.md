@@ -77,9 +77,9 @@ Answered by research (see `docs/research/claude-web-mcp.md`, section 8):
 - Claude Web remote connector calls come from Anthropic's cloud. Verified.
 - Claude Web cannot run local stdio MCP servers. Verified.
 - Claude Desktop extensions (`.mcpb`) are installed per user and run as local stdio processes. Verified.
+- Claude Desktop stops waiting for a tool call between 55 and 70 seconds (about 60). Verified by the owner's test on 2026-11-19.
 
 Still open:
 
-- Claude Desktop timeout. About 60 seconds and not configurable, from user reports only. Confirm with a real test.
 - Folder where extensions are stored on macOS. The owner checks this on a real Mac.
 - Does claude.ai accept a custom connector URL that has a secret token in its path? Confirm with a real test.

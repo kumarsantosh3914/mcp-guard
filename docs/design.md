@@ -55,7 +55,7 @@ Why one daemon and many proxies: Claude Desktop starts each server as its own pr
 |---|---|
 | 1 | Claude sends `tools/call` to the proxy or gateway |
 | 2 | The proxy sends an approval request to the daemon: source, server, tool, arguments, a unique id |
-| 3 | The daemon queues it and shows the popup. The 45 second timer starts when the request arrives, not when it is shown |
+| 3 | The daemon queues it and shows the popup. The 45 second timer starts when the request arrives, not when it is shown. Claude Desktop gives up after about 60 seconds (measured), and that budget covers both the popup and the tool. 45 seconds leaves at least 15 seconds for the tool to run |
 | 4a | Allow: the proxy forwards the original message to the real server and relays the answer back |
 | 4b | Block, timeout, or any error: the proxy does not forward. It sends a denial back to Claude |
 | 5 | The daemon writes one audit log line with the outcome |
