@@ -40,7 +40,7 @@ def test_handshake_and_list(tmp_path):
         [INIT, INITIALIZED, {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}], tmp_path)
     assert code == 0
     assert res[0]["result"]["serverInfo"]["name"] == "fake-mcp-server"
-    assert [t["name"] for t in res[1]["result"]["tools"]] == ["echo", "slow", "fail"]
+    assert [t["name"] for t in res[1]["result"]["tools"]] == ["echo", "slow", "fail", "crash"]
     assert calls == []
 
 

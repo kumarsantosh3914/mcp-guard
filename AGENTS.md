@@ -6,7 +6,9 @@ This file is the single source of truth for all AI coding tools (Claude Code, Cu
 
 ## Status
 
-- Day 1 done when tests pass: package skeleton, `jsonrpc`, `policy`, fake MCP server. Plan is in `docs/design.md`, section 13.
+- Day 1 done: package skeleton, `jsonrpc`, `policy`, fake MCP server.
+- Day 2 done: stdio proxy with development deciders (`allow`, `block`, `wait`). No popup yet.
+- Plan is in `docs/design.md`, section 13.
 - Language: Python. Platform: macOS only. Deadline: 26 November 2026.
 - Requirements and decisions: `docs/requirements.md`. Read it before any design or code work.
 - Architecture is not final. Do not assume. Ask first.

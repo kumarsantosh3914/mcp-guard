@@ -64,6 +64,20 @@ Why one daemon and many proxies: Claude Desktop starts each server as its own pr
 
 `initialize`, `tools/list`, `ping`, notifications, and server-to-client requests pass through unchanged. Methods that need approval are set in config.
 
+The proxy forwards the original bytes of each message. It never re-encodes them, so the real server gets exactly what Claude sent.
+
+### 4.4 Deciders
+
+The proxy asks a "decider" for each gated request. Until the daemon exists, the proxy has three development deciders, chosen with `--decider`:
+
+| Decider | Answer | Use |
+|---|---|---|
+| `block` (default) | Always Block | Safe default |
+| `allow` | Always Allow | Tests and development only |
+| `wait` | Never answers | Tests for timeout and cancel |
+
+The daemon decider replaces these in step 3. A decider that fails, hangs, or gives a bad answer always means Block.
+
 ### 4.3 Denial response
 
 | Request | Response to Claude |
@@ -83,7 +97,16 @@ Why one daemon and many proxies: Claude Desktop starts each server as its own pr
 | Real server crashes | Proxy answers all pending requests with an error, then exits with the same code |
 | Proxy is killed | Daemon drops its pending requests when the socket closes |
 | Daemon crashes while a request waits | Proxy sees the socket close and blocks the request |
-| Bad JSON from either side | Log it. Do not forward. Answer with a JSON-RPC parse error if there is an id |
+| Bad JSON from Claude | Log it. Do not forward. Answer with a JSON-RPC parse error (id `null`) |
+| Bad JSON from the server (often logs printed to stdout by mistake) | Log it. Drop it. Claude never sees it |
+| Valid JSON but not a valid JSON-RPC message from Claude | Do not forward. Answer with "Invalid request" |
+| Batch that contains a gated request | Reject the whole batch: each request in it gets a "blocked" error. Batches were removed from MCP in 2025-06-18, so this should be rare |
+| Batch with no gated request | Forward unchanged |
+| Second request with an id that is still pending | Reject the second one with "Invalid request" |
+| Message larger than 16 MB | Drop it and log it. Answer Claude with an error if it came from Claude |
+| Decider hangs or the daemon is slow | The proxy has its own 45 second timer as a second safety net, then blocks |
+| Real server cannot start | Proxy exits with code 127. Claude Desktop shows the server as failed |
+| Proxy gets SIGTERM or SIGINT | Stop the real server. Answer open requests with an error. Exit |
 | Popup steals focus while the user types | Buttons ignore input for the first second. Enter does not mean Allow. Default focus is Block |
 | Very large arguments | Popup shows a scrollable, truncated view. The full value is still forwarded if allowed |
 

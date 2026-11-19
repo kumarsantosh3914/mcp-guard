@@ -7,6 +7,11 @@ Tools:
   echo   returns the "text" argument
   slow   waits "seconds" (default 2, max 120), then answers
   fail   always returns a tool error
+  crash  exits the server at once with code 3, without answering
+
+Methods (besides the MCP ones):
+  debug/crash   exits the server at once with code 3. Not a tool, so it is never gated.
+  debug/junk    prints a line that is not JSON to stdout, then answers normally.
 
 Options:
   --record PATH   append one JSON line for every tools/call that reaches this server.
@@ -16,6 +21,7 @@ Each tools/call runs in its own thread, so slow calls do not hold up others.
 """
 import argparse
 import json
+import os
 import sys
 import threading
 import time
@@ -42,7 +48,14 @@ TOOLS = [
         "description": "Always return a tool error.",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "crash",
+        "description": "Exit the server at once, without answering.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
+
+CRASH_EXIT_CODE = 3
 
 _write_lock = threading.Lock()
 _record_lock = threading.Lock()
@@ -87,6 +100,9 @@ def call_tool(req_id, params, record_path):
         send_result(req_id, text_result("done after " + str(seconds) + "s"))
     elif name == "fail":
         send_result(req_id, text_result("this tool always fails", is_error=True))
+    elif name == "crash":
+        sys.stdout.flush()
+        os._exit(CRASH_EXIT_CODE)
     else:
         send_error(req_id, -32602, "unknown tool: " + str(name))
 
@@ -107,6 +123,14 @@ def handle(msg, record_path, threads):
             "serverInfo": {"name": "fake-mcp-server", "version": "0.1.0"},
         })
     elif method == "ping":
+        send_result(req_id, {})
+    elif method == "debug/crash":
+        sys.stdout.flush()
+        os._exit(CRASH_EXIT_CODE)
+    elif method == "debug/junk":
+        with _write_lock:
+            sys.stdout.write("this is a log line, not JSON\n")
+            sys.stdout.flush()
         send_result(req_id, {})
     elif method == "tools/list":
         send_result(req_id, {"tools": TOOLS})
