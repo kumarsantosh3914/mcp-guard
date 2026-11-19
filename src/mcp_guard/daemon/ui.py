@@ -33,6 +33,8 @@ from PySide6.QtWidgets import (
 
 from ..approval.decider import Decision
 from ..approval.queue import PendingView
+from ..audit import AuditLog
+from ..config import Config
 from .runtime import DaemonRuntime
 from .server import AlreadyRunning, DaemonError
 
@@ -268,13 +270,21 @@ class Bridge(QObject):
     changed = Signal(object)
 
 
-def run_daemon(socket_path: Path) -> int:
+def run_daemon(socket_path: Path, config: Config) -> int:
+    audit = AuditLog(config.audit_log, config.log_arguments)
+    try:
+        audit.open()
+    except OSError as exc:
+        log.error("could not open the audit log %s: %s", config.audit_log, exc)
+        return 1
+    log.info("audit log: %s", config.audit_log)
+
     app = QApplication.instance() or QApplication(["mcp-guard"])
     app.setApplicationName("mcp-guard")
     app.setQuitOnLastWindowClosed(False)
 
     bridge = Bridge()
-    runtime = DaemonRuntime(socket_path, on_change=bridge.changed.emit)
+    runtime = DaemonRuntime(socket_path, on_change=bridge.changed.emit, audit=audit)
     window = ApprovalWindow(on_decide=runtime.decide)
     bridge.changed.connect(window.update_pending)
     tray = Tray(on_quit=app.quit) if QSystemTrayIcon.isSystemTrayAvailable() else None
@@ -285,9 +295,11 @@ def run_daemon(socket_path: Path) -> int:
         runtime.start()
     except AlreadyRunning as exc:
         log.error("%s", exc)
+        audit.close()
         return 1
     except (DaemonError, OSError) as exc:
         log.error("could not start the daemon: %s", exc)
+        audit.close()
         return 1
 
     # Qt's event loop hides signals from Python. A small timer lets Python run its handlers.
@@ -301,3 +313,4 @@ def run_daemon(socket_path: Path) -> int:
         return app.exec()
     finally:
         runtime.stop()  # blocks every pending request and removes the socket
+        audit.close()

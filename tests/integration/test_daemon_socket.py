@@ -169,6 +169,34 @@ async def test_open_folder_is_refused(socket_path):
         await DaemonServer(ApprovalQueue(), socket_path).start()
 
 
+async def test_decisions_and_cancels_are_audited(socket_path, tmp_path):
+    import json
+
+    from mcp_guard.audit import AuditLog
+
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    audit.open()
+    auto = AutoAnswer(lambda r: Decision.ALLOW if r.tool == "yes" else None)
+    queue = ApprovalQueue(on_change=auto)
+    auto.queue = queue
+    server = DaemonServer(queue, socket_path, audit)
+    await server.start()
+    try:
+        assert (await DaemonDecider(socket_path, timeout=5).decide(summary(tool="yes"))).allowed
+        task = asyncio.create_task(DaemonDecider(socket_path, timeout=10).decide(summary(tool="wait")))
+        await wait_until(lambda: len(queue) == 1)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        await wait_until(lambda: len(queue) == 0)
+        await asyncio.sleep(0.05)
+    finally:
+        await server.close()
+        audit.close()
+    lines = [json.loads(x) for x in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert [(x["tool"], x["decision"]) for x in lines] == [("yes", "allow"), ("wait", "cancelled")]
+
+
 async def test_stopping_daemon_blocks_waiting_requests(daemon, socket_path):
     server, queue, _ = await daemon()
     task = asyncio.create_task(DaemonDecider(socket_path, timeout=10).decide(summary()))

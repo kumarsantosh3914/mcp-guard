@@ -17,6 +17,7 @@ from typing import Callable
 
 from ..approval.decider import Decision
 from ..approval.queue import ApprovalQueue, PendingView
+from ..audit import AuditLog
 from .server import DaemonServer
 
 log = logging.getLogger("mcp_guard.runtime")
@@ -26,9 +27,15 @@ STOP_TIMEOUT_SECONDS = 10.0
 
 
 class DaemonRuntime:
-    def __init__(self, socket_path: Path, on_change: Callable[[list[PendingView]], None] | None = None) -> None:
+    def __init__(
+        self,
+        socket_path: Path,
+        on_change: Callable[[list[PendingView]], None] | None = None,
+        audit: AuditLog | None = None,
+    ) -> None:
         self.socket_path = Path(socket_path)
         self._on_change = on_change
+        self._audit = audit
         self._loop = asyncio.new_event_loop()
         self._ready = threading.Event()
         self._error: BaseException | None = None
@@ -67,7 +74,7 @@ class DaemonRuntime:
     def _run(self) -> None:
         asyncio.set_event_loop(self._loop)
         self.queue = ApprovalQueue(on_change=self._on_change)
-        self.server = DaemonServer(self.queue, self.socket_path)
+        self.server = DaemonServer(self.queue, self.socket_path, self._audit)
         try:
             self._loop.run_until_complete(self.server.start())
         except BaseException as exc:

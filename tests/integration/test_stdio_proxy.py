@@ -19,7 +19,12 @@ from mcp_guard.proxy.stdio_proxy import BATCH_REJECTED, DUPLICATE_ID, SERVER_STO
 ROOT = Path(__file__).resolve().parents[2]
 FAKE = ROOT / "tests" / "fakes" / "fake_mcp_server.py"
 # Point the daemon decider at a socket that does not exist, so tests never reach a real daemon.
-ENV = dict(os.environ, PYTHONPATH=str(ROOT / "src"), MCP_GUARD_SOCKET="/nonexistent/mcp-guard/daemon.sock")
+ENV = dict(
+    os.environ,
+    PYTHONPATH=str(ROOT / "src"),
+    MCP_GUARD_SOCKET="/nonexistent/mcp-guard/daemon.sock",
+    MCP_GUARD_CONFIG="/nonexistent/mcp-guard/config.toml",  # never read the owner's real config
+)
 CRASH_EXIT_CODE = 3
 
 

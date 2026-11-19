@@ -19,10 +19,12 @@ from pathlib import Path
 from .. import __version__
 from ..approval import protocol
 from ..approval.queue import ApprovalQueue
+from ..audit import AuditLog
 
 log = logging.getLogger("mcp_guard.daemon")
 
 READ_TIMEOUT_SECONDS = 5.0
+CANCELLED_TEXT = "Cancelled by Claude before a decision."
 
 
 class DaemonError(RuntimeError):
@@ -52,9 +54,10 @@ async def socket_is_alive(path: Path) -> bool:
 
 
 class DaemonServer:
-    def __init__(self, queue: ApprovalQueue, socket_path: Path) -> None:
+    def __init__(self, queue: ApprovalQueue, socket_path: Path, audit: AuditLog | None = None) -> None:
         self.queue = queue
         self.path = Path(socket_path)
+        self.audit = audit
         self._server: asyncio.base_events.Server | None = None
         self._closed = False
 
@@ -84,8 +87,14 @@ class DaemonServer:
                 self.path.unlink(missing_ok=True)
         log.info("daemon stopped")
 
+    def _record(self, request: protocol.ApprovalRequest, decision: str, reason: str, started: float) -> None:
+        if self.audit is not None:
+            self.audit.record(request, decision, reason, asyncio.get_running_loop().time() - started)
+
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         request = None
+        recorded = False
+        started = asyncio.get_running_loop().time()
         try:
             try:
                 line = await asyncio.wait_for(reader.readline(), READ_TIMEOUT_SECONDS)
@@ -115,15 +124,21 @@ class DaemonServer:
             if future in done and not future.cancelled():
                 verdict = future.result()
                 log.info("%s: %s %s on %r", verdict.decision.value, request.method, request.tool, request.server)
+                self._record(request, verdict.decision.value, verdict.reason, started)
+                recorded = True
                 writer.write(protocol.VerdictMessage(
                     request.request_id, verdict.decision.value, verdict.reason).to_line())
                 await writer.drain()
             else:
                 self.queue.cancel(request.request_id)
                 log.info("request was cancelled by the proxy")
+                self._record(request, "cancelled", CANCELLED_TEXT, started)
+                recorded = True
         except OSError:
             if request is not None:
                 self.queue.cancel(request.request_id)
+                if not recorded:
+                    self._record(request, "cancelled", CANCELLED_TEXT, started)
         except asyncio.CancelledError:
             if request is not None:
                 self.queue.cancel(request.request_id)

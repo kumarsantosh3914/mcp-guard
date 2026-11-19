@@ -9,6 +9,7 @@ This file is the single source of truth for all AI coding tools (Claude Code, Cu
 - Day 1 done: package skeleton, `jsonrpc`, `policy`, fake MCP server.
 - Day 2 done: stdio proxy with development deciders (`allow`, `block`, `wait`).
 - Day 3 done: daemon (socket server, queue, PySide6 popup, menu bar icon). Proxy asks the daemon by default.
+- Day 4 done: audit log, `config.toml`, `mcp-guard status`, `mcp-guard install` and `uninstall`.
 - Plan is in `docs/design.md`, section 13.
 - Language: Python. Platform: macOS only. Deadline: 26 November 2026.
 - Requirements and decisions: `docs/requirements.md`. Read it before any design or code work.

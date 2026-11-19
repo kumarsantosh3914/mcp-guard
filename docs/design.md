@@ -148,13 +148,33 @@ File: `~/Library/Application Support/mcp-guard/config.toml`
 
 | Key | Default | Meaning |
 |---|---|---|
-| `timeout_seconds` | `45` | Time before an unanswered request is blocked |
-| `gated_methods` | `["tools/call"]` | Methods that need approval |
-| `log_arguments` | `"truncated"` | `"none"`, `"truncated"`, or `"full"` |
+| `timeout_seconds` | `45` | Time before an unanswered request is blocked. Must be 1 to 55, because Claude Desktop gives up at about 60 |
+| `gated_methods` | `["tools/call"]` | Extra methods that need approval. `tools/call` is always gated and cannot be removed |
+| `log_arguments` | `"truncated"` | `"none"`, `"truncated"`, or `"full"`. Secret-looking keys are masked in every mode |
+| `audit_log` | `~/Library/Logs/mcp-guard/audit.jsonl` | Where decisions are logged |
 | `gateway.port` | `8787` | Local port. The tunnel points here |
 | `gateway.token` | generated at install | Secret path token |
 | `gateway.allowed_ips` | Anthropic outbound ranges | IP allowlist |
 | `[gateway.servers.<name>]` | none | Servers exposed through the gateway: a stdio command or an upstream URL |
+
+Rules:
+
+- A missing file means defaults.
+- A broken file, an unknown key, or a bad value is an error. The daemon and the proxies refuse to start, so nothing can run unchecked (fail closed).
+- Command line flags win over the file.
+- The `[gateway]` table is reserved for the HTTP gateway.
+
+### 7.1 Audit log
+
+| Point | Rule |
+|---|---|
+| Writer | Only the daemon, so lines never mix |
+| Entry | `time` (UTC), `source`, `server`, `method`, `tool`, `decision` (`allow`, `block`, or `cancelled`), `reason`, `decided_in_ms`, `arguments` |
+| Masking | Values under keys that contain `token`, `password`, `secret`, `key`, `authorization`, `cookie`, `credential`, `session`, or `private` become `***` |
+| Large arguments | Cut to 2000 characters after masking. A display preview from the proxy is never logged, because its text cannot be masked |
+| Access | File mode 600, folder mode 700 |
+| Old entries | Never removed or overwritten. No rotation in this version |
+| Not in the log | Requests blocked because the daemon was not running. The proxy writes those to Claude Desktop's server log |
 
 ## 8. Install and run (user view)
 
